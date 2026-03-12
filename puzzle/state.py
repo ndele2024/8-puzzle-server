@@ -64,7 +64,7 @@ class PuzzleState:
     }
 
     for move, (r, c) in moves.items():
-      if 0 <= r < 3 and 0 <= c < 3:
+      if 0 <= r < len(self.board) and 0 <= c < len(self.board[0]):
         new_board = [row[:] for row in self.board]
         new_board[row][col], new_board[r][c] = new_board[r][c], new_board[row][col]
         neighbors.append(PuzzleState(

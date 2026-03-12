@@ -2,7 +2,6 @@ import heapq
 from typing import Tuple, Any
 from abc import abstractmethod, ABC
 
-from puzzle import heuristic
 from puzzle.heuristic import IHeuristic
 from puzzle.state import PuzzleState
 
@@ -16,14 +15,12 @@ class IsolverStrategy(ABC):
 #concrete strategy
 class BfsStrategy(IsolverStrategy):
   def solve(self, initial_state: PuzzleState) -> tuple[PuzzleState, int] | tuple[None, int]:
-    """Breadth-First Search - Garantit la solution optimale mais lent"""
     queue = [initial_state]
     visited = set()
     visited.add(initial_state)
 
     while queue:
       current = queue.pop(0)
-
       if current.is_goal():
         return current, current.cost
 
@@ -36,8 +33,24 @@ class BfsStrategy(IsolverStrategy):
 
 
 class DfsStrategy(IsolverStrategy):
-  def solve(self, initial_state: PuzzleState) -> Tuple[PuzzleState, int]:
-    pass
+  def solve(self, initial_state: PuzzleState)-> Tuple[PuzzleState, int] | tuple[None, int]:
+    stack = [initial_state]
+    visited = set()
+    while stack:
+      current = stack.pop()
+      if current.is_goal():
+        return current, current.cost
+
+      if current in visited:
+        continue
+
+      visited.add(current)
+
+      for neighbor in reversed(current.get_neighbors()):
+        if neighbor not in visited:
+          stack.append(neighbor)
+
+    return None, 0
 
 
 class AstarStrategy(IsolverStrategy):
@@ -67,3 +80,51 @@ class AstarStrategy(IsolverStrategy):
         heapq.heappush(open_set, (priority, new_cost, neighbor))
 
     return None, 0  # Pas de solution
+
+
+class IdaStarStrategy(IsolverStrategy):
+
+  heuristic: IHeuristic
+
+  def __init__(self, heuristic: IHeuristic):
+    self.heuristic = heuristic
+
+  def solve(self, initial_state: PuzzleState):
+
+    threshold = self.heuristic.calculate(initial_state)
+
+    while True:
+
+      temp = self.search(initial_state, 0, threshold)
+
+      if isinstance(temp, PuzzleState):
+        return temp, temp.cost
+
+      if temp == float("inf"):
+        return None, 0
+
+      threshold = temp
+
+  def search(self, state, g, threshold):
+
+    f = g + self.heuristic.calculate(state)
+
+    if f > threshold:
+      return f
+
+    if state.is_goal():
+      return state
+
+    minimum = float("inf")
+
+    for neighbor in state.get_neighbors():
+
+      temp = self.search(neighbor, g + 1, threshold)
+
+      if isinstance(temp, PuzzleState):
+        return temp
+
+      if temp < minimum:
+        minimum = temp
+
+    return minimum
