@@ -2,16 +2,17 @@ from typing import List, Tuple, Optional
 import random
 from dataclasses import dataclass
 
+
 @dataclass
 class PuzzleState:
   """
-    classe représentant l'état du puzzle a un instant
+    classe representant l'etat du puzzle a un instant
   """
   board: List[List[int]]
   empty_position: Tuple[int, int]
   parent: Optional['PuzzleState'] = None
-  cost : int = 0
-  move : Optional[str] = None  # "UP", "DOWN", "LEFT", "RIGHT"
+  cost: int = 0
+  move: Optional[str] = None  # "UP", "DOWN", "LEFT", "RIGHT"
 
   def __empty_cellule_position__(self) -> tuple[int, int] | None:
     """
@@ -23,36 +24,59 @@ class PuzzleState:
           return i, j
     return None
 
-  #egalité entre deux états selon la matrice des cases
+  def validate(self) -> None:
+    """
+      Verifie que la grille est bien formee et que `empty_position`
+      correspond reellement a la case vide.
+    """
+    if not self.board or not self.board[0]:
+      raise ValueError("La grille ne peut pas etre vide.")
+
+    row_length = len(self.board[0])
+    if any(len(row) != row_length for row in self.board):
+      raise ValueError("Toutes les lignes de la grille doivent avoir la meme taille.")
+
+    expected_values = list(range(len(self.board) * row_length))
+    actual_values = sorted(x for row in self.board for x in row)
+    if actual_values != expected_values:
+      raise ValueError("La grille doit contenir exactement les valeurs de 0 a n*m-1.")
+
+    actual_empty_position = self.__empty_cellule_position__()
+    if actual_empty_position != self.empty_position:
+      raise ValueError("La position vide fournie ne correspond pas a la case 0 de la grille.")
+
+  # egalite entre deux etats selon la matrice des cases
   def __eq__(self, other) -> bool:
     return self.board == other.board
 
   def __hash__(self):
     return hash(tuple(tuple(row) for row in self.board))
-    #return hash(str(self.board))
 
   def __lt__(self, other):
     return self.cost < other.cost
 
-  #génère l'état final recherché (deux état finaux possibles)
-  #exemple pour une grille de 3*3 [[1, 2, 3], [4, 5, 6], [7, 8, 0]] ou [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
-  def genarate_goal_state(self) -> List[List[int]]:
+  def generate_goal_state(self) -> List[List[int]]:
+    """
+      Genere l'etat final de reference du puzzle:
+      1..(n*m-1) avec 0 en bas a droite.
+    """
     n, m = len(self.board), len(self.board[0])
-    goal_state1 = [[i * m + j for j in range(m)] for i in range(n)]
-    goal_state2 = [[(i * m + j) % (n * m) for j in range(m)] for i in range(n)]
-    #ici on doit retourner un tuple contenant les deux états finaux possibles (-------------à faire---------------)
-    return goal_state1
+    values = list(range(1, n * m)) + [0]
+    return [[values[i * m + j] for j in range(m)] for i in range(n)]
+
+  # Conserve l'ancien nom pour ne pas casser le reste du projet.
+  def genarate_goal_state(self) -> List[List[int]]:
+    return self.generate_goal_state()
 
   def is_goal(self) -> bool:
     """
-      vérifie si l'état actuel est un état final
+      verifie si l'etat actuel est un etat final
     """
-    goal_state = self.genarate_goal_state()
-    return self.board == goal_state
+    return self.board == self.generate_goal_state()
 
   def get_neighbors(self) -> List['PuzzleState']:
     """
-      retourne une liste d'état enfant à partir de l'état actuel
+      retourne une liste d'etat enfant a partir de l'etat actuel
     """
     neighbors = []
     row, col = self.empty_position
@@ -65,46 +89,37 @@ class PuzzleState:
 
     for move, (r, c) in moves.items():
       if 0 <= r < len(self.board) and 0 <= c < len(self.board[0]):
-        new_board = [row[:] for row in self.board]
+        new_board = [current_row[:] for current_row in self.board]
         new_board[row][col], new_board[r][c] = new_board[r][c], new_board[row][col]
         neighbors.append(PuzzleState(
-            board = new_board,
-            empty_position = (r, c),
-            parent = self,
-            move = move,
-            cost = self.cost + 1
+            board=new_board,
+            empty_position=(r, c),
+            parent=self,
+            move=move,
+            cost=self.cost + 1
         ))
     return neighbors
 
   @staticmethod
-  def generate_random_state(n = 3, m = 3) :
-    #n, m = 3, 3
+  def generate_random_state(n=3, m=3):
     numbers = list(range(n * m))
     random.shuffle(numbers)
-    #on génère l'état
     board = [[numbers[i * m + j] for j in range(m)] for i in range(n)]
 
-    #Vérification si le puzzle est solvable
     is_solvable, _ = PuzzleState.is_solvable_puzzle(board)
     while not is_solvable:
       random.shuffle(numbers)
-      # on génère l'état
       board = [[numbers[i * m + j] for j in range(m)] for i in range(n)]
       is_solvable, _ = PuzzleState.is_solvable_puzzle(board)
 
-    # on trouve la position de la valeur 0
-    pos_0 = -1
-    for i in range(n * m):
-      if numbers[i] == 0:
-        pos_0 = i
-        break
-    # on convertit en tuple (i,j)
+    pos_0 = numbers.index(0)
     empty_position = (pos_0 // m, pos_0 % m)
-    return PuzzleState(board = board, empty_position = empty_position)
+    return PuzzleState(board=board, empty_position=empty_position)
 
   @staticmethod
   def is_solvable_puzzle(board):
     n = len(board)
+    m = len(board[0])
     flat_all = [x for row in board for x in row]
     flat = [x for x in flat_all if x != 0]
 
@@ -114,15 +129,14 @@ class PuzzleState:
         if flat[i] > flat[j]:
           inversions += 1
 
-    if n % 2 == 1:
-      # largeur impaire (3x3 par exemple)
+    if m % 2 == 1:
+      # Largeur impaire: le puzzle est soluble quand le nombre d'inversions est pair.
       return inversions % 2 == 0, inversions
 
-    # largeur paire: dépend de la ligne du zéro en partant du bas
+    # Largeur paire: on tient compte de la ligne du zero en partant du bas.
     zero_index = flat_all.index(0)
-    zero_row_from_top = zero_index // n
+    zero_row_from_top = zero_index // m
     zero_row_from_bottom = n - zero_row_from_top
-
     solvable = (inversions + zero_row_from_bottom) % 2 == 0
 
     return solvable, inversions

@@ -6,18 +6,17 @@ from puzzle.heuristic import IHeuristic
 from puzzle.state import PuzzleState
 
 
-#Interface strategy for all diferents solvers methods
+# Interface strategy for all differents solvers methods
 class IsolverStrategy(ABC):
   @abstractmethod
   def solve(self, initial_state: PuzzleState) -> Tuple[PuzzleState, int]:
     pass
 
-#concrete strategy
+
 class BfsStrategy(IsolverStrategy):
   def solve(self, initial_state: PuzzleState) -> tuple[PuzzleState, int] | tuple[None, int]:
     queue = [initial_state]
-    visited = set()
-    visited.add(initial_state)
+    visited = {initial_state}
 
     while queue:
       current = queue.pop(0)
@@ -26,37 +25,37 @@ class BfsStrategy(IsolverStrategy):
 
       for neighbor in current.get_neighbors():
         if neighbor not in visited:
-            visited.add(neighbor)
-            queue.append(neighbor)
+          visited.add(neighbor)
+          queue.append(neighbor)
 
-    return None, 0  # Pas de solution
+    return None, 0
 
 
 class DfsStrategy(IsolverStrategy):
-  def solve(self, initial_state: PuzzleState)-> Tuple[PuzzleState, int] | tuple[None, int]:
+  def solve(self, initial_state: PuzzleState) -> Tuple[PuzzleState, int] | tuple[None, int]:
     stack = [initial_state]
-    visited = set()
+    visited = {initial_state}
+
     while stack:
       current = stack.pop()
       if current.is_goal():
         return current, current.cost
 
-      if current in visited:
-        continue
-
-      visited.add(current)
-
-      for neighbor in reversed(current.get_neighbors()):
+      # On empile seulement les voisins jamais vus. Comme la pile depile le
+      # dernier element ajoute, conserver l'ordre natif permet d'explorer un
+      # voisin direct pertinent avant de partir dans une branche tres profonde.
+      for neighbor in current.get_neighbors():
         if neighbor not in visited:
+          visited.add(neighbor)
           stack.append(neighbor)
 
     return None, 0
 
 
 class AstarStrategy(IsolverStrategy):
-  heuristic : IHeuristic
+  heuristic: IHeuristic
 
-  def __init__(self, heurist : IHeuristic):
+  def __init__(self, heurist: IHeuristic):
     self.heuristic = heurist
 
   def solve(self, initial_state: PuzzleState) -> tuple[Any, Any] | tuple[None, int]:
@@ -79,23 +78,20 @@ class AstarStrategy(IsolverStrategy):
         priority = new_cost + self.heuristic.calculate(neighbor)
         heapq.heappush(open_set, (priority, new_cost, neighbor))
 
-    return None, 0  # Pas de solution
+    return None, 0
 
 
 class IdaStarStrategy(IsolverStrategy):
-
   heuristic: IHeuristic
 
   def __init__(self, heuristic: IHeuristic):
     self.heuristic = heuristic
 
   def solve(self, initial_state: PuzzleState):
-
     threshold = self.heuristic.calculate(initial_state)
 
     while True:
-
-      temp = self.search(initial_state, 0, threshold)
+      temp = self.search(initial_state, 0, threshold, set())
 
       if isinstance(temp, PuzzleState):
         return temp, temp.cost
@@ -105,8 +101,7 @@ class IdaStarStrategy(IsolverStrategy):
 
       threshold = temp
 
-  def search(self, state, g, threshold):
-
+  def search(self, state, g, threshold, path_states):
     f = g + self.heuristic.calculate(state)
 
     if f > threshold:
@@ -116,10 +111,14 @@ class IdaStarStrategy(IsolverStrategy):
       return state
 
     minimum = float("inf")
+    new_path_states = set(path_states)
+    new_path_states.add(state)
 
     for neighbor in state.get_neighbors():
+      if neighbor in new_path_states:
+        continue
 
-      temp = self.search(neighbor, g + 1, threshold)
+      temp = self.search(neighbor, g + 1, threshold, new_path_states)
 
       if isinstance(temp, PuzzleState):
         return temp
