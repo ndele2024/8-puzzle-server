@@ -76,7 +76,7 @@ class PuzzleState:
 
   def get_neighbors(self) -> List['PuzzleState']:
     """
-      retourne une liste d'etat enfant a partir de l'etat actuel
+      retourne une liste d'etat enfant à partir de l'état actuel
     """
     neighbors = []
     row, col = self.empty_position
